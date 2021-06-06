@@ -1,0 +1,88 @@
+<!-- See https://www.jetbrains.org/intellij/sdk/docs/basics/plugin_structure/plugin_configuration_file.html -->
+<idea-plugin>
+    <id>com.xobotun.idea.UnsupportedMethodInspection</id>
+    <name>Unsupported Method Inspection</name>
+    <vendor email="idea_plugin@xobotun.com" url="https://xobotun.com">Xobotun</vendor>
+
+    <description><![CDATA[
+        Warns you when you call a method that will throw an exception right away.
+        <!-- tooltip end -->
+        The following snippet shows the purpose of the inspection.
+        It will highlight the second method call that is actually not supported for this object.
+
+        This inspection is not very stable and will miss some cases. Like when IDEA is not able to determine precise class type for the inspection to analyze the method implementation.
+
+        <pre>
+        class Example {
+            public static void main(String[] args) {
+                MalformedAbstraction normal = new NormalImplementation();
+                normal.doSomething(); // Works flawlessly
+
+                MalformedAbstraction broken = new IncompleteImplementation();
+                broken.doSomething(); // Suddenly throws exception, but you'll probably know this only at runtime.
+            }
+        }
+
+        interface MalformedAbstraction {
+            void doSomething();
+        }
+
+        class NormalImplementation implements MalformedAbstraction {
+            @Override
+            public void doSomething() {
+                // Computes something
+            }
+        }
+
+        class IncompleteImplementation implements MalformedAbstraction {
+            @Override
+            public void doSomething() {
+                throw new UnsupportedOperationException("There might be a class has this method working");
+            }
+        }
+        </pre>
+    ]]></description>
+
+    <change-notes><![CDATA[
+    1.0.0:<br/>
+        Initial release of the plugin.
+    ]]></change-notes>
+
+    <depends>com.intellij.modules.platform</depends>
+    <depends>com.intellij.modules.java</depends>
+
+    <idea-version since-build="192"/>
+
+    <extensions defaultExtensionNs="com.intellij">
+        <!--
+          Extend the IntelliJ Platform local inspection type, and connect it to the implementation class in this plugin.
+
+          <localInspection> type element is applied within the scope of a file under edit.
+          It is preferred over <inspectionToolProvider>
+            @see intellij.platform.resources.LangExtensionPoints
+            @see com.intellij.codeInspection.InspectionProfileEntry
+
+          Attributes:
+            language= Language ID
+            shortName= Not specified, will be computed by the underlying implementation classes.
+            displayName= The string to be shown in the Preferences | Editor | Inspections panel
+                The displayName gets registered to identify this inspection.
+                Can be localized using key= and bundle= attributes instead.
+            groupPath= Defines the outermost grouping for this inspection in
+                the Preferences | Editor | Inspections panel. Not localized.
+            groupName= The subgroup containing this inspection. Not localized.
+            enabledByDefault= Inspection state when Inspections panel is created.
+            level= The default level of error found by this inspection, e.g. INFO, ERROR, etc.
+                @see com.intellij.codeHighlighting.HighlightDisplayLevel
+            implementationClass= FQN of inspection implementation
+        -->
+        <localInspection language="UAST"
+                         displayName="Call to method that throws exception right away"
+                         groupName="Probable bugs"
+                         groupPath="Java"
+                         enabledByDefault="true"
+                         level="WARNING"
+                         implementationClass="com.xobotun.idea.uminspection.UnsupportedMethodInspection"/>
+    </extensions>
+
+</idea-plugin>

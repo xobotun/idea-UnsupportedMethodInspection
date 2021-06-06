@@ -1,2 +1,2 @@
-# idea-VerticalAlign
-Plugin for Intellij IDEA that allows you to indent all multicursors to a vertical line.
+# idea-UnsupportedMethodInspection
+Plugin for Intellij IDEA that warns you when you call a method that will throw an exception right away.
