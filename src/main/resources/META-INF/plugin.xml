@@ -6,7 +6,9 @@
 
     <description><![CDATA[
         Warns you when you call a method that will throw an exception right away.
-        <!-- tooltip end -->
+
+        <em>Warning</em>: completely unoptimised version. Will excessively use CPU. Uses no PSI or UAST caches.
+
         The following snippet shows the purpose of the inspection.
         It will highlight the second method call that is actually not supported for this object.
 

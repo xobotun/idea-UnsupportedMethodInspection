@@ -9,19 +9,20 @@ class Example {
 }
 
 interface MalformedAbstraction {
-    void doSomething();
+    int doSomething();
 }
 
 class NormalImplementation implements MalformedAbstraction {
     @Override
-    public void doSomething() {
+    public int doSomething() {
         // Computes something
+        return 1;
     }
 }
 
 class IncompleteImplementation implements MalformedAbstraction {
     @Override
-    public void doSomething() {
+    public int doSomething() {
         throw new UnsupportedOperationException("There might be a class has this method working");
     }
 }
