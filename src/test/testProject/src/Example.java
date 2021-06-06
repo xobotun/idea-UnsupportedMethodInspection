@@ -3,6 +3,7 @@ class Example {
         MalformedAbstraction normal = new NormalImplementation();
         normal.doSomething(); // Works flawlessly
 
+        
         MalformedAbstraction broken = new IncompleteImplementation();
         broken.doSomething(); // Suddenly throws exception, but you'll probably know this only at runtime.
     }

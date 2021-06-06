@@ -5,43 +5,47 @@
     <vendor email="idea_plugin@xobotun.com" url="https://xobotun.com">Xobotun</vendor>
 
     <description><![CDATA[
-        Warns you when you call a method that will throw an exception right away.
-
-        <em>Warning</em>: completely unoptimised version. Will excessively use CPU. Uses no PSI or UAST caches.
-
-        The following snippet shows the purpose of the inspection.
-        It will highlight the second method call that is actually not supported for this object.
-
-        This inspection is not very stable and will miss some cases. Like when IDEA is not able to determine precise class type for the inspection to analyze the method implementation.
-
+        Warns you when you call a method that will throw an exception right away.<br/>
+        <br/>
+        <s>Warning</s>: completely unoptimised version. Will excessively use CPU. Uses no PSI or UAST caches.<br/>
+        <br/>
+        Appears under "Java > Probable bugs > Call to method that throws exception right away" in "File > Settings > Editor > Inspections".<br/>
+        <br/>
+        <hr/>
+        <br/>
+        The following snippet shows the purpose of the inspection.<br/>
+        It will highlight the second method call that is actually not supported for this object.<br/>
+        <br/>
+        This inspection is not very stable and will miss some cases. Like when IDEA is not able to determine precise class type for the inspection to analyze the method implementation.<br/>
+        <br/>
         <pre>
-        class Example {
-            public static void main(String[] args) {
-                MalformedAbstraction normal = new NormalImplementation();
-                normal.doSomething(); // Works flawlessly
+class Example {
+    public static void main(String[] args) {
+        MalformedAbstraction normal = new NormalImplementation();
+        normal.doSomething(); // Works flawlessly
 
-                MalformedAbstraction broken = new IncompleteImplementation();
-                broken.doSomething(); // Suddenly throws exception, but you'll probably know this only at runtime.
-            }
-        }
+        MalformedAbstraction broken = new IncompleteImplementation();
+        broken.doSomething(); // Suddenly throws exception, but you'll probably know this only at runtime.
+    }
+}
 
-        interface MalformedAbstraction {
-            void doSomething();
-        }
+interface MalformedAbstraction {
+    void doSomething();
+}
 
-        class NormalImplementation implements MalformedAbstraction {
-            @Override
-            public void doSomething() {
-                // Computes something
-            }
-        }
+class NormalImplementation implements MalformedAbstraction {
+    @Override
+    public void doSomething() {
+        // Computes something
+    }
+}
 
-        class IncompleteImplementation implements MalformedAbstraction {
-            @Override
-            public void doSomething() {
-                throw new UnsupportedOperationException("There might be a class has this method working");
-            }
-        }
+class IncompleteImplementation implements MalformedAbstraction {
+    @Override
+    public void doSomething() {
+        throw new UnsupportedOperationException("There might be a class has this method working");
+    }
+}
         </pre>
     ]]></description>
 

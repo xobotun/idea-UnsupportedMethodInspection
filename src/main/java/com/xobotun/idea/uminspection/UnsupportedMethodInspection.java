@@ -2,6 +2,7 @@ package com.xobotun.idea.uminspection;
 
 import com.intellij.codeInspection.*;
 import com.intellij.codeInspection.ex.ProblemDescriptorImpl;
+import com.intellij.lang.jvm.JvmModifier;
 import com.intellij.openapi.module.Module;
 import com.intellij.openapi.project.Project;
 import com.intellij.openapi.vfs.VirtualFile;
@@ -69,7 +70,11 @@ class CallSiteVisitor extends AbstractUastVisitor {
     public boolean visitCallExpression(@NotNull final UCallExpression node) {
         PsiMethod method = node.resolve();
         if (method != null) {
-            handleKnownMethod(node, method);
+            if (method.hasModifier(JvmModifier.ABSTRACT)) {
+                // TODO: figure out real node.getReceiver() type
+            } else {
+                handleKnownMethod(node, method);
+            }
         } else if (node instanceof JavaConstructorUCallExpression) {
             JavaConstructorUCallExpression constructor = (JavaConstructorUCallExpression) node;
         } else {
@@ -98,7 +103,7 @@ class CallSiteVisitor extends AbstractUastVisitor {
     }
 
     protected void handleCompiledSource(UCallExpression node, PsiMethod thatWasCalled) {
-
+        node.getSourcePsi().getNavigationElement();
     }
 
     protected void raiseWarning(UCallExpression callSite, @Nullable PsiType exceptionType) {
