@@ -13,17 +13,14 @@ import com.intellij.psi.search.GlobalSearchScope;
 import com.intellij.psi.search.SearchScope;
 import com.intellij.psi.search.searches.ReferencesSearch;
 import com.intellij.util.Processor;
+import kotlin.Pair;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
-import org.jetbrains.uast.UCallExpression;
-import org.jetbrains.uast.UElement;
-import org.jetbrains.uast.UField;
-import org.jetbrains.uast.UMethod;
+import org.jetbrains.uast.*;
 import org.jetbrains.uast.java.JavaConstructorUCallExpression;
 import org.jetbrains.uast.visitor.AbstractUastVisitor;
 
-import java.util.ArrayList;
-import java.util.List;
+import java.util.*;
 
 import static com.xobotun.idea.LogUtils.showInfo;
 import static com.xobotun.idea.ProjectUtils.currentProject;
@@ -57,13 +54,24 @@ public class UnsupportedMethodInspection extends AbstractBaseUastLocalInspection
 }
 
 class CallSiteVisitor extends AbstractUastVisitor {
-    final InspectionManager manager;
-    final boolean isOnTheFly;
+    protected final InspectionManager manager;
+    protected final boolean isOnTheFly;
     List<ProblemDescriptor> problemsFound = new ArrayList<>();
+    protected Map<String, PsiType> declarations = new HashMap<>();
 
     public CallSiteVisitor(final InspectionManager manager, final boolean isOnTheFly) {
         this.manager = manager;
         this.isOnTheFly = isOnTheFly;
+    }
+
+    // Variables are fields, local variables, parameters, etc.
+    @Override
+    public boolean visitVariable(@NotNull final UVariable node) {
+        UExpression initializer = node.getUastInitializer();
+        if (initializer != null) {
+            declarations.put(node.getName(), initializer.getExpressionType());
+        }
+        return false; // This is not our main purpose, just a side effect. Return false to contiune logic of traversing the code block
     }
 
     @Override
@@ -71,12 +79,13 @@ class CallSiteVisitor extends AbstractUastVisitor {
         PsiMethod method = node.resolve();
         if (method != null) {
             if (method.hasModifier(JvmModifier.ABSTRACT)) {
-                // TODO: figure out real node.getReceiver() type
+                // TODO: what about non-overriden methods that were overriden somewhere up in the hierarchy?
+                handleKnownAbstractMethod(node, method);
             } else {
-                handleKnownMethod(node, method);
+                handleKnownMethod(node, node.getReceiverType(), method);
             }
-        } else if (node instanceof JavaConstructorUCallExpression) {
-            JavaConstructorUCallExpression constructor = (JavaConstructorUCallExpression) node;
+        } else if (node instanceof JavaConstructorUCallExpression || node.getClass().getSimpleName().contains("onstructor")) {
+            // Just ignore constructors for now. They don't throw exceptions, normally. Or at least those that throw them are usually private.
         } else {
             showInfo(String.format("Failed to inspect if method call %s can lead to an exception throw", node.getClass()));
         }
@@ -84,31 +93,57 @@ class CallSiteVisitor extends AbstractUastVisitor {
         return true;
     }
 
-    protected void handleKnownMethod(UCallExpression node, PsiMethod thatWasCalled) {
+    protected void handleKnownAbstractMethod(UCallExpression node, PsiMethod thatWasCalled) {
+        UExpression receiver = node.getReceiver();
+
+        if (receiver instanceof UReferenceExpression) {
+            String receiverName = ((UReferenceExpression)receiver).getResolvedName();
+            PsiType receiverActualType = declarations.get(receiverName);
+            if (receiverActualType instanceof PsiClassType && !receiverActualType.equals(receiver.getExpressionType())) {
+                PsiClass actualClass = ((PsiClassType) receiverActualType).resolve();
+                if (actualClass != null) {
+                    PsiMethod[] allMethods = actualClass.getAllMethods();
+                    Optional<Pair<PsiMethod, PsiMethod>> actualMethod = Arrays.stream(allMethods)
+                                                                              .flatMap(m -> Arrays.stream(m.findSuperMethods(false)).map(sm -> new Pair<>(m, sm)))
+                                                                              .filter(pair -> pair.getSecond().equals(thatWasCalled))
+                                                                              .findFirst();
+                    if (actualMethod.isPresent()) {
+                        handleKnownMethod(node, receiverActualType, actualMethod.get().getFirst());
+                        return;
+                    }
+                }
+            }
+        }
+
+        showInfo(String.format("Failed to inspect if method call %s.%s can lead to an exception throw", node, thatWasCalled));
+    }
+
+    protected void handleKnownMethod(UCallExpression callSite, PsiType receiverType, PsiMethod thatWasCalled) {
         PsiCodeBlock code = thatWasCalled.getBody();
         if (code == null) {
-            handleCompiledSource(node, thatWasCalled);
+            handleCompiledSource(callSite, thatWasCalled);
         } else {
-            handleKnownSource(node, code);
+            handleKnownSource(callSite, receiverType, code);
         }
     }
 
-    protected void handleKnownSource(UCallExpression node, PsiCodeBlock code) {
+    protected void handleKnownSource(UCallExpression node, PsiType receiverType, PsiCodeBlock code) {
         PsiStatement[] statements = code.getStatements();
         if (statements.length > 0 && statements[0] instanceof PsiThrowStatement) {
             // Only the first statement should be 'throw'. Otherwise there might be more logic before it. And it is a too complicated of a case.
             PsiType exceptionType = tryExtractExceptionType((PsiThrowStatement)statements[0]);
-            raiseWarning(node, exceptionType);
+            raiseWarning(node, receiverType, exceptionType);
         }
     }
 
     protected void handleCompiledSource(UCallExpression node, PsiMethod thatWasCalled) {
+        System.out.printf("Cannot get sources for %s%n", node);
         node.getSourcePsi().getNavigationElement();
     }
 
-    protected void raiseWarning(UCallExpression callSite, @Nullable PsiType exceptionType) {
+    protected void raiseWarning(UCallExpression callSite, PsiType receiverType, @Nullable PsiType exceptionType) {
         problemsFound.add( manager.createProblemDescriptor(callSite.getSourcePsi(),
-               String.format("Calling '%s' will throw %s", callSite.getMethodName(), exceptionType != null ? exceptionType.getPresentableText() : "an exception"),
+               String.format("Calling '%s.%s' will throw %s", receiverType.getPresentableText(), callSite.getMethodName(), exceptionType != null ? exceptionType.getPresentableText() : "an exception"),
                new LocalQuickFix[0], ProblemHighlightType.WARNING, isOnTheFly, false));
     }
 
